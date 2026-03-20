@@ -1,0 +1,952 @@
+{
+  "metadata": {
+    "title": "Sounding Analysis Parameters and Calculations",
+    "version": "2.1",
+    "description": "Complete reference for atmospheric sounding thermodynamic and kinematic calculations used in severe weather forecasting",
+    "categories": ["Thermodynamic", "Kinematic", "Composite", "Winter Weather", "Fire Weather"]
+  },
+  "constants": {
+    "gravitational_acceleration": {
+      "symbol": "g",
+      "value": 9.81,
+      "unit": "m/s²"
+    },
+    "dry_air_gas_constant": {
+      "symbol": "Rd",
+      "value": 287.04,
+      "unit": "J/kg/K"
+    },
+    "water_vapor_gas_constant": {
+      "symbol": "Rv",
+      "value": 461.5,
+      "unit": "J/kg/K"
+    },
+    "specific_heat_dry_air": {
+      "symbol": "Cp_d",
+      "value": 1005,
+      "unit": "J/kg/K"
+    },
+    "specific_heat_water_vapor": {
+      "symbol": "Cp_v",
+      "value": 1870,
+      "unit": "J/kg/K"
+    },
+    "specific_heat_liquid_water": {
+      "symbol": "Cp_l",
+      "value": 4190,
+      "unit": "J/kg/K"
+    },
+    "specific_heat_ice": {
+      "symbol": "Cp_i",
+      "value": 2106,
+      "unit": "J/kg/K"
+    },
+    "latent_heat_vaporization": {
+      "symbol": "Lv",
+      "value": 2501000,
+      "unit": "J/kg"
+    },
+    "latent_heat_fusion": {
+      "symbol": "Lf",
+      "value": 333000,
+      "unit": "J/kg"
+    },
+    "latent_heat_sublimation": {
+      "symbol": "Ls",
+      "value": 2834000,
+      "unit": "J/kg"
+    },
+    "triple_point_temperature": {
+      "symbol": "T_trip",
+      "value": 273.15,
+      "unit": "K"
+    },
+    "epsilon": {
+      "symbol": "ε",
+      "value": 0.62197,
+      "description": "Rd/Rv ratio"
+    },
+    "poisson_constant": {
+      "symbol": "κ",
+      "value": 0.28571426,
+      "description": "Rd/Cp ratio"
+    }
+  },
+  "thermodynamic_calculations": {
+    "saturation_vapor_pressure": {
+      "symbol": "es",
+      "input": {
+        "temperature": "°C"
+      },
+      "output": "hPa",
+      "method": "Bolton (1980) polynomial approximation",
+      "formula": "es = 6.112 * exp(17.67 * T / (T + 243.5))",
+      "implementation": "Eighth-order polynomial for computational efficiency"
+    },
+    "mixing_ratio": {
+      "symbol": "w",
+      "input": {
+        "pressure": "hPa",
+        "dewpoint": "°C"
+      },
+      "output": "g/kg",
+      "formula": "w = ε * e / (p - e)",
+      "where": "e = saturation vapor pressure at dewpoint, ε = 0.622"
+    },
+    "virtual_temperature": {
+      "symbol": "Tv",
+      "input": {
+        "temperature": "°C",
+        "mixing_ratio": "g/kg"
+      },
+      "output": "°C",
+      "formula": "Tv = T * (1 + w/ε) / (1 + w)",
+      "notes": "Tv ≥ T always; accounts for density reduction from water vapor"
+    },
+    "potential_temperature": {
+      "symbol": "θ",
+      "input": {
+        "pressure": "hPa",
+        "temperature": "°C",
+        "reference_pressure": "hPa (default 1000)"
+      },
+      "output": "K",
+      "formula": "θ = T * (p₀/p)^κ",
+      "where": "κ = Rd/Cp ≈ 0.286"
+    },
+    "equivalent_potential_temperature": {
+      "symbol": "θe",
+      "input": {
+        "pressure": "hPa",
+        "temperature": "°C",
+        "dewpoint": "°C"
+      },
+      "output": "K",
+      "method": "Lift parcel to LCL, then along moist adiabat to reference level",
+      "formula": "θe = θ_dry * exp(Lv * ws / (Cp * T_LCL))"
+    },
+    "wet_bulb_temperature": {
+      "symbol": "Tw",
+      "input": {
+        "pressure": "hPa",
+        "temperature": "°C",
+        "dewpoint": "°C"
+      },
+      "output": "°C",
+      "method": "Iterative Normand's rule: find LCL, descend moist adiabatically to original pressure"
+    },
+    "lifted_condensation_level": {
+      "symbol": "LCL",
+      "input": {
+        "pressure": "hPa",
+        "temperature": "°C",
+        "dewpoint": "°C"
+      },
+      "output": {
+        "height": "m AGL",
+        "pressure": "hPa",
+        "temperature": "°C"
+      },
+      "approximation": "LCL_height ≈ 125 * (T - Td) meters",
+      "method": "Intersection of dry adiabat from T with mixing ratio line from Td"
+    },
+    "moist_adiabatic_lapse_rate": {
+      "symbol": "Γm",
+      "formula": "Γm = g * (1 + Lv*ws/(Rd*T)) / (Cp + Lv²*ws/(Rv*T²))",
+      "typical_values": "4-7 °C/km depending on temperature and moisture"
+    },
+    "relative_humidity": {
+      "symbol": "RH",
+      "input": {
+        "temperature": "°C",
+        "dewpoint": "°C"
+      },
+      "output": "%",
+      "formula": "RH = 100 * e(Td) / es(T)"
+    }
+  },
+  "parcel_theory": {
+    "parcel_types": {
+      "surface_based": {
+        "abbreviation": "SB",
+        "description": "Parcel lifted from surface conditions",
+        "starting_level": "Surface (lowest observation)"
+      },
+      "mixed_layer": {
+        "abbreviation": "ML",
+        "description": "Parcel representing mean conditions of lowest 100 hPa",
+        "starting_level": "Mean θ and mean mixing ratio of lowest 100 hPa layer",
+        "method": "Average potential temperature and mixing ratio, then calculate T and Td at surface pressure"
+      },
+      "most_unstable": {
+        "abbreviation": "MU",
+        "description": "Parcel with highest θe in lowest 300 hPa",
+        "starting_level": "Level with maximum equivalent potential temperature",
+        "search_depth": "Surface to surface minus 300 hPa"
+      },
+      "effective": {
+        "abbreviation": "EFF",
+        "description": "Layer where parcels meet buoyancy and inhibition criteria",
+        "criteria": {
+          "CAPE": "≥ 100 J/kg",
+          "CIN": "≥ -250 J/kg"
+        }
+      }
+    },
+    "cape": {
+      "name": "Convective Available Potential Energy",
+      "symbol": "CAPE",
+      "unit": "J/kg",
+      "formula": "CAPE = g * ∫[LFC to EL] (Tv_parcel - Tv_env) / Tv_env dz",
+      "method": "Trapezoidal integration from LFC to EL",
+      "variants": {
+        "SBCAPE": "Surface-based CAPE",
+        "MLCAPE": "Mixed-layer CAPE (100 hPa mean parcel)",
+        "MUCAPE": "Most-unstable CAPE",
+        "CAPE3": "CAPE in lowest 3 km (0-3 km CAPE)",
+        "CAPE6": "CAPE in lowest 6 km",
+        "HGZCAPE": "CAPE in Hail Growth Zone (-10°C to -30°C layer)"
+      },
+      "thresholds": {
+        "marginal": "< 1000 J/kg",
+        "moderate": "1000-2500 J/kg",
+        "high": "2500-4000 J/kg",
+        "extreme": "> 4000 J/kg"
+      }
+    },
+    "cin": {
+      "name": "Convective Inhibition",
+      "symbol": "CIN",
+      "unit": "J/kg",
+      "formula": "CIN = g * ∫[surface to LFC] (Tv_env - Tv_parcel) / Tv_env dz",
+      "notes": "Expressed as negative values; represents energy barrier to convection",
+      "thresholds": {
+        "weak": "> -50 J/kg",
+        "moderate": "-50 to -200 J/kg",
+        "strong": "< -200 J/kg"
+      }
+    },
+    "ncape": {
+      "name": "Normalized CAPE",
+      "symbol": "NCAPE",
+      "unit": "m/s²",
+      "formula": "NCAPE = CAPE / (EL - LFC)",
+      "interpretation": "Average buoyancy in the cloud-bearing layer"
+    },
+    "lfc": {
+      "name": "Level of Free Convection",
+      "symbol": "LFC",
+      "unit": "m AGL or hPa",
+      "definition": "Height where rising parcel first becomes warmer than environment"
+    },
+    "el": {
+      "name": "Equilibrium Level",
+      "symbol": "EL",
+      "unit": "m AGL or hPa",
+      "definition": "Height where rising parcel temperature equals environment temperature above LFC"
+    },
+    "mpl": {
+      "name": "Maximum Parcel Level",
+      "symbol": "MPL",
+      "unit": "m AGL",
+      "definition": "Maximum height a parcel can reach by using all its CAPE"
+    }
+  },
+  "kinematic_calculations": {
+    "storm_motion": {
+      "bunkers_method": {
+        "name": "Bunkers Internal Dynamics Method",
+        "reference": "Bunkers et al. (2000)",
+        "output": {
+          "right_mover": "Anticipated motion of right-moving supercell",
+          "left_mover": "Anticipated motion of left-moving supercell",
+          "mean_wind": "Non-pressure-weighted 0-6 km mean wind"
+        },
+        "method": {
+          "step1": "Calculate pressure-weighted mean wind from surface to 6 km",
+          "step2": "Calculate 0-6 km shear vector",
+          "step3": "Apply 7.5 m/s deviation perpendicular to shear",
+          "deviation": "7.5 m/s to the right of shear for RM, left for LM"
+        },
+        "formula": {
+          "RM": "V_mean + (7.5/|shear|) * (shear_y, -shear_x)",
+          "LM": "V_mean - (7.5/|shear|) * (shear_y, -shear_x)"
+        }
+      },
+      "deviant_tornado_motion": {
+        "description": "Mean of 0-500m wind and supercell motion",
+        "DTMR": "(V_0-500m + V_RM) / 2",
+        "DTML": "(V_0-500m + V_LM) / 2"
+      }
+    },
+    "storm_relative_helicity": {
+      "name": "Storm Relative Helicity",
+      "symbol": "SRH",
+      "unit": "m²/s²",
+      "formula": "SRH = ∫[(V - C) × ∂V/∂z] dz",
+      "where": {
+        "V": "Environmental wind vector",
+        "C": "Storm motion vector"
+      },
+      "computational_form": "SRH = Σ[(u₁-Cx)(v₂-Cy) - (u₂-Cx)(v₁-Cy)]",
+      "layers": {
+        "SRH_0-500m": "Effective 0-500 m SRH",
+        "SRH_0-1km": "Effective 0-1 km SRH (most common)",
+        "SRH_0-3km": "Effective 0-3 km SRH",
+        "ESRH": "Effective inflow layer SRH"
+      },
+      "thresholds": {
+        "weak": "< 100 m²/s²",
+        "moderate": "100-300 m²/s²",
+        "strong": "300-500 m²/s²",
+        "extreme": "> 500 m²/s²"
+      }
+    },
+    "bulk_wind_difference": {
+      "name": "Bulk Wind Difference (Shear)",
+      "symbol": "BWD",
+      "unit": "knots or m/s",
+      "formula": "BWD = V(top) - V(bottom)",
+      "layers": {
+        "BWD_0-500m": "0-500 m bulk shear",
+        "BWD_0-1km": "0-1 km bulk shear",
+        "BWD_0-3km": "0-3 km bulk shear",
+        "BWD_0-6km": "0-6 km bulk shear (deep layer)",
+        "BWD_1-3km": "1-3 km bulk shear",
+        "BWD_3-6km": "3-6 km bulk shear",
+        "EBWD": "Effective bulk wind difference"
+      },
+      "thresholds_0-6km": {
+        "weak": "< 20 kt",
+        "moderate": "20-40 kt",
+        "strong": "40-60 kt",
+        "extreme": "> 60 kt"
+      }
+    },
+    "mean_wind": {
+      "pressure_weighted": {
+        "formula": "V_mean = Σ(V_i * p_i) / Σp_i",
+        "description": "Gives more weight to denser lower levels"
+      },
+      "non_pressure_weighted": {
+        "formula": "V_mean = Σ(V_i) / n",
+        "description": "Simple arithmetic mean"
+      }
+    },
+    "wind_direction_rotation": {
+      "description": "Cumulative directional change with height",
+      "layer": "0-3 km in 250 m steps",
+      "formula": "Rotation = Σ|(WD_lower - WD_upper)|",
+      "interpretation": "Large values indicate veering/backing with height"
+    }
+  },
+  "effective_layer_parameters": {
+    "effective_inflow_layer": {
+      "description": "Layer where parcels have sufficient buoyancy to sustain convection",
+      "criteria": {
+        "CAPE": "≥ 100 J/kg",
+        "CIN": "≥ -250 J/kg"
+      },
+      "output": {
+        "bottom": "Bottom of effective layer (hPa)",
+        "top": "Top of effective layer (hPa)",
+        "is_surface_based": "Boolean indicating if layer starts at surface"
+      }
+    },
+    "effective_bulk_wind_difference": {
+      "symbol": "EBWD",
+      "description": "Shear vector across effective inflow layer",
+      "fallback": "0-6 km shear if no effective layer exists"
+    },
+    "effective_storm_relative_helicity": {
+      "symbol": "ESRH",
+      "description": "SRH integrated through effective inflow layer"
+    }
+  },
+  "composite_parameters": {
+    "supercell_composite": {
+      "name": "Supercell Composite Parameter",
+      "symbol": "SCP",
+      "formula": "(MUCAPE/1000) × (ESRH/50) × (EBWD/20)",
+      "terms": {
+        "MUCAPE": {
+          "normalization": 1000,
+          "unit": "J/kg"
+        },
+        "ESRH": {
+          "normalization": 50,
+          "unit": "m²/s²"
+        },
+        "EBWD": {
+          "normalization": 20,
+          "range": [10, 20],
+          "unit": "m/s",
+          "notes": "Values < 10 m/s set to 0; capped at 20 m/s"
+        }
+      },
+      "thresholds": {
+        "conditional": "> 1",
+        "favorable": "> 4",
+        "strongly_favorable": "> 10"
+      }
+    },
+    "significant_tornado_parameter_fixed": {
+      "name": "Significant Tornado Parameter (Fixed Layer)",
+      "symbol": "STP",
+      "formula": "(SBCAPE/1500) × (SRH_0-1km/150) × (EBWD/20) × LCL_term",
+      "terms": {
+        "SBCAPE": {
+          "normalization": 1500,
+          "unit": "J/kg"
+        },
+        "SRH_0-1km": {
+          "normalization": 150,
+          "unit": "m²/s²"
+        },
+        "EBWD": {
+          "normalization": 20,
+          "range": [12.5, 30],
+          "unit": "m/s"
+        },
+        "LCL_term": {
+          "formula": "LCL < 1000m → 1.0; LCL > 2000m → 0.0; else → (2000-LCL)/1000"
+        }
+      },
+      "thresholds": {
+        "conditional": "> 1",
+        "significant": "> 3",
+        "high": "> 5"
+      }
+    },
+    "significant_tornado_parameter_cin": {
+      "name": "Significant Tornado Parameter (Effective Layer)",
+      "symbol": "STP_eff",
+      "formula": "(MLCAPE/1500) × (ESRH/150) × (EBWD/20) × LCL_term × CIN_term",
+      "terms": {
+        "MLCAPE": {
+          "normalization": 1500,
+          "unit": "J/kg"
+        },
+        "ESRH": {
+          "normalization": 150,
+          "unit": "m²/s²"
+        },
+        "EBWD": {
+          "normalization": 20,
+          "range": [12.5, 30],
+          "unit": "m/s",
+          "notes": "< 12.5 → 0; > 30 → 1.5"
+        },
+        "LCL_term": {
+          "formula": "MLLCL < 1000m → 1.0; MLLCL > 2000m → 0.0; else → (2000-LCL)/1000"
+        },
+        "CIN_term": {
+          "formula": "MLCIN > -50 → 1.0; MLCIN < -200 → 0.0; else → (CIN+200)/150"
+        }
+      }
+    },
+    "significant_hail_parameter": {
+      "name": "Significant Hail Parameter",
+      "symbol": "SHIP",
+      "formula": "(MUCAPE × LR_700-500 × -T500 × MixRat × EBWD) / 42,000,000",
+      "terms": {
+        "MUCAPE": {
+          "unit": "J/kg"
+        },
+        "LR_700-500": {
+          "unit": "°C/km",
+          "modifier": "If < 5.8, multiply result by LR/5.8"
+        },
+        "T500": {
+          "formula": "-min(-5.5, T500)",
+          "unit": "°C"
+        },
+        "MixRat": {
+          "range": [11, 13.6],
+          "unit": "g/kg"
+        },
+        "EBWD": {
+          "range": [7, 27],
+          "unit": "m/s"
+        }
+      },
+      "conditional_modifiers": [
+        "If MUCAPE < 1300 J/kg: multiply by MUCAPE/1300",
+        "If LR_700-500 < 5.8 °C/km: multiply by LR/5.8",
+        "If Freezing Level < 2400 m: multiply by FrzLvl/2400"
+      ],
+      "thresholds": {
+        "conditional": "> 0.5",
+        "favorable": "> 1.0",
+        "significant": "> 1.5"
+      }
+    },
+    "wind_damage_parameter": {
+      "name": "Wind Damage Parameter",
+      "symbol": "WNDG",
+      "formula": "(LR_0-3km/9) × ((50+MLCIN)/40) × (MLCAPE/2000) × (MeanWind_1-3.5km/15)",
+      "terms": {
+        "LR_0-3km": {
+          "unit": "°C/km",
+          "notes": "Set to 0 if < 7 °C/km"
+        },
+        "MLCIN": {
+          "unit": "J/kg",
+          "notes": "Capped at -50 J/kg"
+        },
+        "MLCAPE": {
+          "normalization": 2000,
+          "unit": "J/kg"
+        },
+        "MeanWind_1-3.5km": {
+          "normalization": 15,
+          "unit": "m/s"
+        }
+      }
+    },
+    "derecho_composite": {
+      "name": "Derecho Composite Parameter",
+      "symbol": "DCP",
+      "formula": "(DCAPE/980) × (MUCAPE/2000) × (EBWD/20) × (MeanWind_0-6km/16)",
+      "terms": {
+        "DCAPE": {
+          "normalization": 980,
+          "unit": "J/kg"
+        },
+        "MUCAPE": {
+          "normalization": 2000,
+          "unit": "J/kg"
+        },
+        "EBWD": {
+          "normalization": 20,
+          "unit": "m/s"
+        },
+        "MeanWind_0-6km": {
+          "normalization": 16,
+          "unit": "m/s"
+        }
+      }
+    },
+    "energy_helicity_index": {
+      "name": "Energy Helicity Index",
+      "symbol": "EHI",
+      "formula": "(CAPE × SRH) / 160,000",
+      "layers": ["0-500m", "0-1km", "0-3km", "Effective"],
+      "thresholds": {
+        "conditional": "> 1",
+        "favorable": "> 2",
+        "significant": "> 3"
+      }
+    },
+    "significant_severe": {
+      "name": "Significant Severe Parameter",
+      "symbol": "SigSvr",
+      "formula": "MLCAPE × EBWD",
+      "unit": "m³/s³",
+      "notes": "EBWD in m/s",
+      "thresholds": {
+        "threshold": "> 30,000 m³/s³"
+      }
+    },
+    "tehi": {
+      "name": "Tornadic Energy Helicity Index",
+      "symbol": "TEHI",
+      "formula": "(SRH_0-1km × MLCAPE / 160,000) × (CAPE3/200) × (BWD_0-6km/20)",
+      "conditions": [
+        "Set to 0 if MLCIN < -100 J/kg",
+        "Set to 0 if SBCIN < -200 J/kg",
+        "Set to 0 if MLLCL > 1700 m"
+      ],
+      "term_adjustments": {
+        "CAPE3": "If MLCAPE > 1500: min(200, CAPE3); else: min(300, CAPE3)",
+        "BWD_0-6km": "< 12.5 m/s → 0; > 30 m/s → 1.5; else → BWD/20"
+      }
+    },
+    "tts": {
+      "name": "Tornado Tilting and Stretching",
+      "symbol": "TTS",
+      "description": "Parameter for low-CAPE, high-shear tornado environments",
+      "formula": "(SRH_0-1km × CAPE3 / 6500) × CAPE_term × (BWD_0-6km/20)",
+      "conditions": [
+        "Set to 0 if MLCIN < -100 J/kg",
+        "Set to 0 if SBCIN < -200 J/kg",
+        "Set to 0 if MLLCL > 1700 m"
+      ],
+      "term_adjustments": {
+        "CAPE3": "Clamped to [0, 150] J/kg",
+        "CAPE_term": "If MLCAPE < 2000: 1.0; else: clamp(MLCAPE/2000, 1, 1.5)"
+      }
+    }
+  },
+  "stability_indices": {
+    "k_index": {
+      "name": "K-Index",
+      "symbol": "KI",
+      "formula": "(T850 - T500) + Td850 - (T700 - Td700)",
+      "unit": "°C",
+      "interpretation": {
+        "< 20": "Convection not likely",
+        "20-25": "Isolated thunderstorms possible",
+        "26-30": "Widely scattered thunderstorms",
+        "31-35": "Scattered thunderstorms likely",
+        "> 35": "Numerous thunderstorms likely"
+      }
+    },
+    "total_totals": {
+      "name": "Total Totals Index",
+      "symbol": "TT",
+      "formula": "VT + CT = (T850 - T500) + (Td850 - T500)",
+      "components": {
+        "VT": "Vertical Totals = T850 - T500",
+        "CT": "Cross Totals = Td850 - T500"
+      },
+      "unit": "°C",
+      "interpretation": {
+        "< 44": "Convection unlikely",
+        "44-50": "Thunderstorms possible",
+        "51-52": "Isolated severe storms possible",
+        "53-56": "Scattered severe storms likely",
+        "> 56": "Significant severe weather likely"
+      }
+    },
+    "lifted_index": {
+      "name": "Lifted Index",
+      "symbol": "LI",
+      "formula": "T_env(500mb) - T_parcel(500mb)",
+      "unit": "°C",
+      "variants": {
+        "surface_lifted_index": "Parcel from surface",
+        "best_lifted_index": "Most unstable parcel"
+      },
+      "interpretation": {
+        "> 0": "Stable",
+        "0 to -3": "Marginally unstable",
+        "-3 to -6": "Moderately unstable",
+        "-6 to -9": "Very unstable",
+        "< -9": "Extremely unstable"
+      }
+    },
+    "bulk_richardson_number": {
+      "name": "Bulk Richardson Number",
+      "symbol": "BRN",
+      "formula": "CAPE / (0.5 × Shear²)",
+      "shear_definition": "Vector difference: mean wind 0-6km minus mean wind 0-500m",
+      "interpretation": {
+        "< 10": "Strong shear relative to buoyancy; supercells likely",
+        "10-45": "Favorable balance for supercells",
+        "> 45": "Weak shear relative to buoyancy; multicells likely"
+      }
+    }
+  },
+  "downdraft_parameters": {
+    "dcape": {
+      "name": "Downdraft CAPE",
+      "symbol": "DCAPE",
+      "unit": "J/kg",
+      "method": {
+        "step1": "Find minimum θe in lowest 400 hPa",
+        "step2": "Start parcel at that level's wet-bulb temperature",
+        "step3": "Descend parcel moist adiabatically to surface",
+        "step4": "Integrate negative buoyancy"
+      },
+      "formula": "DCAPE = g × ∫[start to surface] (Tv_env - Tv_parcel) / Tv_env dz",
+      "thresholds": {
+        "weak": "< 500 J/kg",
+        "moderate": "500-1000 J/kg",
+        "strong": "> 1000 J/kg"
+      }
+    },
+    "downdraft_temperature": {
+      "name": "Downdraft Temperature",
+      "symbol": "DownT",
+      "unit": "°F",
+      "description": "Estimated surface temperature of downdraft air",
+      "interpretation": "Lower values indicate stronger cold pool potential"
+    }
+  },
+  "entraining_cape": {
+    "ecape": {
+      "name": "Entraining CAPE",
+      "symbol": "ECAPE",
+      "reference": "Peters et al. (2020)",
+      "description": "CAPE accounting for entrainment of environmental air",
+      "formula": "ECAPE = V²/2 + f(ε, NCAPE, CAPE)",
+      "parameters": {
+        "sigma": {
+          "value": 1.6,
+          "description": "Updraft width parameter"
+        },
+        "alpha": {
+          "value": 0.8,
+          "description": "Entrainment coefficient"
+        },
+        "L_mix": {
+          "value": 120,
+          "unit": "m",
+          "description": "Mixing length"
+        },
+        "Prandtl": {
+          "value": 0.333,
+          "description": "Turbulent Prandtl number"
+        }
+      },
+      "entrainment_rate": "ε = 0.18 × α² × π² × L_mix / (Pr × σ² × EL)"
+    },
+    "sr_wind_integral": {
+      "description": "Storm-relative wind speed integrated through updraft depth",
+      "formula": "∫ |V - C| dz from surface to EL",
+      "unit": "m²/s"
+    }
+  },
+  "temperature_parameters": {
+    "convective_temperature": {
+      "name": "Convective Temperature",
+      "symbol": "ConvT",
+      "unit": "°F",
+      "description": "Surface temperature needed for surface-based convection initiation",
+      "method": "Find where surface mixing ratio line intersects temperature profile; descend dry adiabatically to surface"
+    },
+    "maximum_temperature": {
+      "name": "Maximum Temperature Forecast",
+      "symbol": "MaxT",
+      "unit": "°F",
+      "method": "Follow surface parcel up 150 hPa, then descend dry adiabatically to surface"
+    },
+    "maximum_wet_bulb": {
+      "name": "Maximum Wet Bulb Temperature",
+      "symbol": "MaxWB",
+      "unit": "°C",
+      "layer": "Surface to surface minus 400 hPa",
+      "description": "Maximum wet-bulb temperature in lowest 400 hPa"
+    },
+    "freezing_level": {
+      "name": "Freezing Level",
+      "symbol": "FrzLvl",
+      "unit": "m AGL",
+      "definition": "Height of 0°C isotherm"
+    },
+    "lcl_temperature": {
+      "name": "LCL Temperature",
+      "unit": "°F",
+      "description": "Temperature at the lifted condensation level"
+    }
+  },
+  "fire_weather_indices": {
+    "fosberg_fire_weather_index": {
+      "name": "Fosberg Fire Weather Index",
+      "symbol": "FFWI",
+      "range": [0, 100],
+      "formula": "FFWI = η × √(1 + U²) / 0.3002",
+      "where": {
+        "η": "Function of equilibrium moisture content m",
+        "U": "Wind speed (mph)"
+      },
+      "equilibrium_moisture": {
+        "RH < 10": "m = 0.03229 + 0.281073×RH - 0.000578×RH×T",
+        "RH 10-50": "m = 2.22749 + 0.160107×RH - 0.01478×T",
+        "RH > 50": "m = 21.0606 + 0.005565×RH² - 0.00035×RH×T - 0.483199×RH"
+      },
+      "interpretation": {
+        "< 25": "Low fire danger",
+        "25-50": "Moderate fire danger",
+        "50-75": "High fire danger",
+        "> 75": "Extreme fire danger"
+      }
+    },
+    "hot_dry_windy_index": {
+      "name": "Hot-Dry-Windy Index",
+      "symbol": "HDWI",
+      "formula": "HDWI = max(VPD_0-500m) × max(Wind_0-500m)",
+      "where": {
+        "VPD": "Vapor pressure deficit = es(T) - e(Td)"
+      },
+      "description": "Product of maximum VPD and wind speed in lowest 500m"
+    },
+    "red_flag_threat_index": {
+      "name": "Red Flag Threat Index",
+      "symbol": "RFTI",
+      "formula": "RFTI = Wind(mph) / RH(%)",
+      "description": "Simple ratio of wind speed to relative humidity"
+    }
+  },
+  "winter_weather_parameters": {
+    "snow_squall_parameter": {
+      "name": "Snow Squall Parameter",
+      "symbol": "SNSP",
+      "formula": "RH_term × θe_term × Wind_term",
+      "layers": "Surface to 2 km",
+      "terms": {
+        "RH_term": "RH < 60% → 0; else → (RH-60)/15",
+        "θe_term": "(4 - Δθe) / 4",
+        "Wind_term": "MeanWind / 9 m/s"
+      },
+      "interpretation": "Higher values indicate greater snow squall potential"
+    },
+    "precipitation_type": {
+      "method": "Warm and Cold Layer Analysis",
+      "algorithm": {
+        "step1": "Identify warm layers (T > 0°C) and cold layers (T ≤ 0°C)",
+        "step2": "Calculate warm area (temperature sum) and cold area",
+        "step3": "Evaluate layer depths and temperature maximums",
+        "step4": "Apply decision logic"
+      },
+      "decision_tree": {
+        "surface_above_freezing": {
+          "max_warm > 4°C": "Rain",
+          "max_warm < 1.5°C": "Snow",
+          "default": "Rain"
+        },
+        "surface_below_freezing": {
+          "no_warm_layer": "Snow",
+          "cold_depth < 300m OR warm_depth > 2×cold_depth OR ratio > 3": "Freezing Rain",
+          "cold_depth > 600m AND max_warm > 3°C": "Ice Pellets",
+          "cold_depth > 400m": "Ice Pellets",
+          "default": "Freezing Rain"
+        }
+      },
+      "output_types": ["Rain", "Snow", "Freezing Rain", "Ice Pellets", "Mixed"]
+    },
+    "dendritic_growth_zone": {
+      "name": "Dendritic Growth Zone",
+      "symbol": "DGZ",
+      "layer": "-12°C to -18°C",
+      "description": "Layer where dendritic ice crystal growth is maximized",
+      "parameters": {
+        "depth": {
+          "unit": "m",
+          "formula": "|H(-12°C) - H(-18°C)|"
+        },
+        "omega": {
+          "unit": "Pa/s",
+          "description": "Mean vertical velocity in DGZ"
+        },
+        "pwat": {
+          "unit": "inches",
+          "description": "Mean precipitable water in DGZ"
+        },
+        "rh": {
+          "unit": "%",
+          "description": "Mean relative humidity in DGZ"
+        },
+        "mixing_ratio": {
+          "unit": "g/kg",
+          "description": "Mean mixing ratio in DGZ"
+        },
+        "oprh": {
+          "formula": "Omega × PWAT × RH",
+          "interpretation": "Negative values (upward motion) favor snow production"
+        }
+      }
+    }
+  },
+  "lapse_rates": {
+    "height_based": {
+      "formula": "Γ = -(T_top - T_bottom) / (z_top - z_bottom)",
+      "unit": "°C/km",
+      "sign_convention": "Positive = temperature decreasing with height",
+      "layers": {
+        "LR_0-3km": "Low-level lapse rate",
+        "LR_3-6km": "Mid-level lapse rate",
+        "LR_0-6km": "Deep layer lapse rate"
+      }
+    },
+    "pressure_based": {
+      "formula": "Γ = (T_lower - T_upper) / (z_upper - z_lower)",
+      "unit": "°C/km",
+      "layers": {
+        "LR_700-500": "700-500 hPa lapse rate (commonly used)",
+        "LR_850-500": "850-500 hPa lapse rate"
+      }
+    },
+    "typical_values": {
+      "dry_adiabatic": "9.8 °C/km",
+      "moist_adiabatic": "4-7 °C/km",
+      "absolutely_stable": "< 6 °C/km",
+      "conditionally_unstable": "6-9.8 °C/km",
+      "absolutely_unstable": "> 9.8 °C/km"
+    }
+  },
+  "moisture_parameters": {
+    "precipitable_water": {
+      "name": "Precipitable Water",
+      "symbol": "PWAT",
+      "unit": "inches",
+      "formula": "PWAT = (1/ρg) × ∫ w dp",
+      "integration": "Surface to 400 hPa",
+      "interpretation": "Total water vapor in atmospheric column if condensed"
+    },
+    "mean_mixing_ratio": {
+      "description": "Average mixing ratio over a specified layer",
+      "method": "Average dewpoint, then calculate mixing ratio at mean pressure"
+    },
+    "theta_e_difference": {
+      "name": "θe Difference",
+      "common_layer": "Surface to 3 km",
+      "formula": "Δθe = θe(surface) - θe(3km)",
+      "interpretation": "Large positive values indicate potential instability"
+    }
+  },
+  "shear_layers": {
+    "standard_layers": [
+      {"id": "0-500m", "bottom": "Surface", "top": "500 m AGL"},
+      {"id": "0-1km", "bottom": "Surface", "top": "1 km AGL"},
+      {"id": "0-3km", "bottom": "Surface", "top": "3 km AGL"},
+      {"id": "0-6km", "bottom": "Surface", "top": "6 km AGL"},
+      {"id": "1-3km", "bottom": "1 km", "top": "3 km"},
+      {"id": "3-6km", "bottom": "3 km", "top": "6 km"},
+      {"id": "0-9km", "bottom": "Surface", "top": "9 km"},
+      {"id": "0-12km", "bottom": "Surface", "top": "12 km"},
+      {"id": "9-12km", "bottom": "9 km", "top": "12 km"}
+    ],
+    "pressure_layers": [
+      {"id": "Sfc-300mb", "bottom": "Surface", "top": "300 hPa"},
+      {"id": "Sfc-500mb", "bottom": "Surface", "top": "500 hPa"},
+      {"id": "Sfc-700mb", "bottom": "Surface", "top": "700 hPa"}
+    ],
+    "temperature_layers": [
+      {"id": "DGZ", "bottom": "-12°C level", "top": "-18°C level"},
+      {"id": "Sfc-to-18", "bottom": "Surface", "top": "-18°C level"},
+      {"id": "HGZ", "bottom": "-10°C level", "top": "-30°C level"}
+    ],
+    "parameters_per_layer": ["SRH", "BWD", "EHI", "Mean Wind"]
+  },
+  "unit_conversions": {
+    "wind_speed": {
+      "knots_to_ms": 0.514444,
+      "ms_to_knots": 1.94384,
+      "mph_to_ms": 0.44704,
+      "ms_to_mph": 2.23694
+    },
+    "temperature": {
+      "celsius_to_fahrenheit": "F = C × 9/5 + 32",
+      "fahrenheit_to_celsius": "C = (F - 32) × 5/9",
+      "celsius_to_kelvin": "K = C + 273.15"
+    },
+    "pressure": {
+      "hPa_to_mb": 1.0,
+      "inHg_to_hPa": 33.8639
+    },
+    "height": {
+      "feet_to_meters": 0.3048,
+      "meters_to_feet": 3.28084
+    }
+  },
+  "interpolation_methods": {
+    "pressure_level": {
+      "description": "Linear interpolation between surrounding pressure levels",
+      "formula": "f(p) = f(p1) + (f(p2) - f(p1)) × (p - p1) / (p2 - p1)"
+    },
+    "height_level": {
+      "description": "Linear interpolation between surrounding height levels",
+      "formula": "f(z) = f(z1) + (f(z2) - f(z1)) × (z - z1) / (z2 - z1)"
+    },
+    "temperature_level": {
+      "description": "Find height/pressure where temperature equals target value",
+      "method": "Linear interpolation between bounding levels"
+    },
+    "wind_interpolation": {
+      "description": "Vector interpolation of u and v components separately",
+      "method": "Convert to components, interpolate, convert back to speed/direction"
+    }
+  }
+}
