@@ -2,6 +2,7 @@
   "metadata": {
     "title": "Sounding Analysis Parameters and Calculations",
     "version": "2.1",
+    "author": "James Pettus",
     "description": "Complete reference for atmospheric sounding thermodynamic and kinematic calculations used in severe weather forecasting",
     "categories": ["Thermodynamic", "Kinematic", "Composite", "Winter Weather", "Fire Weather"]
   },
